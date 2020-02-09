@@ -96,3 +96,56 @@ $ node app/app.js
 - http://localhost:3333/api/
     - `app/api/index.js` でルーティングされる
     - JSONデータ `{"message": "Hello, Express!"}` が返される
+
+***
+
+## Docker
+
+### Structure
+```bash
+./
+|_ app/ # 作業ディレクトリ => docker://express:/home/node/app/
+|   |_ app.js   # Expressサーバ｜https://web.local/ => docker://express:3333
+|
+|_ docker/ # Dockerコンテナ設定
+|   |_ certs/   # SSL証明書格納ディレクトリ
+|   |_ express/ # expressコンテナ
+|       |_ Dockerfile
+|       |_ package.json # 必要なnode_modulesを記述
+|
+|_ docker-compose.yml
+```
+
+### コンテナ起動
+```bash
+# Docker実行ユーザIDを合わせてDockerコンテナビルド
+$ export UID && docker-compose build
+
+# コンテナ起動
+$ export UID && docker-compose up -d
+
+## => https://web.local/ でサーバ稼働
+```
+
+### 本番公開時
+```bash
+# -- user@server
+
+# masterブランチ pull
+$ pull origin master
+
+# docker-compose.yml の変更を無視
+$ git update-index --assume-unchanged docker-compose.yml
+
+# 本番公開用の docker-compose.yml 作成
+## --host <ドメイン名>: 公開ドメイン名
+## --email <メールアドレス>: Let's Encrypt 申請用メールアドレス（省略時: admin@<ドメイン名>）
+## +noproxy: 複数のDockerComposeで運用していて nginx-proxy, letsencrypt コンテナが別に定義されている場合に指定
+$ node handledocker.js --host yourdomain.com --email yourmail@yourdomain.com +noproxy
+
+# Docker実行ユーザIDを合わせてDockerコンテナビルド
+$ export UID && docker-compose build
+
+# コンテナ起動
+$ export UID && docker-compose up -d
+```
