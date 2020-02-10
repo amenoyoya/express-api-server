@@ -6,7 +6,9 @@ ARG UID
 # Projectディレクトリ
 ARG PRJDIR=/home/node/
 
-RUN : 'nodeユーザIDをDocker実行ユーザIDと合わせる' && \
+RUN : 'puppeteer用の各種パッケージ導入' && \
+    apk add --no-cache chromium nss freetype freetype-dev harfbuzz ca-certificates ttf-freefont && \
+    : 'nodeユーザIDをDocker実行ユーザIDと合わせる' && \
     apk add --no-cache shadow && \
     usermod -u $UID node && \
     : 'nodeユーザをsudoersに追加' && \

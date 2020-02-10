@@ -16,6 +16,9 @@ services:
 {{/if}}
     environment:
       TZ: Asia/Tokyo
+      # puppeteerがインストール済みのChromeを使うように設定
+      ## 参考: https://github.com/puppeteer/puppeteer/blob/master/docs/troubleshooting.md
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
       # VIRTUAL_HOST設定（nginx-proxy）
 {{#if host}}
       VIRTUAL_HOST: {{host}} # http://{{host}}/ => docker://express:3333
