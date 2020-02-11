@@ -30,7 +30,7 @@ $ yarn add express
 |   |_ api/    # API提供
 |   |   |_ index.js # /api/* ルーティング
 |   |
-|   |_ static/ # 静的ファイルホスティング
+|   |_ public/ # 静的ファイルホスティング
 |   |
 |   |_ app.js  # Expressサーバ｜メインスクリプト
 |
@@ -50,8 +50,8 @@ app.use(express.urlencoded({ extended: true })); // 配列型のフォームデ�
 // API ルーティング: /api/* => ./api/index.js
 app.use('/api/', require('./api/index'));
 
-// 静的ファイルホスティング: /* => ./static/*
-app.use('/', express.static(`${__dirname}/static`));
+// 静的ファイルホスティング: /* => ./public/*
+app.use('/', express.static(`${__dirname}/public`));
 
 // ポート番号: $EXPRESS_PORT 環境変数 or 3333
 const port = process.env.EXPRESS_PORT || 3333;
@@ -148,4 +148,197 @@ $ export UID && docker-compose build
 
 # コンテナ起動
 $ export UID && docker-compose up -d
+```
+
+***
+
+## Express Server + Webpack 開発
+
+### 開発に必要なパッケージ導入
+開発時に必要な Webpack 系のパッケージを導入する（公開時には Webpack でバンドルされた後のファイルを静的ホスティングするだけ）
+
+```bash
+# Webpack関連のパッケージをインストール
+$ yarn add  webpack webpack-cli babel-loader @babel/core @babel/preset-env \
+            babel-polyfill css-loader style-loader
+
+# sass, scss のコンパイラを導入
+$ yarn add sass-loader node-sass
+
+# VueとVueのWebpack用ローダをインストール
+$ yarn add vue vue-loader vue-template-compiler
+
+# npm scripts を並列実行するためのパッケージをインストール
+$ yarn add concurrently
+```
+
+### 構成
+```bash
+./
+|_ app/ # Expressアプリケーション
+|   |_ api/    # API提供
+|   |   |_ index.js # /api/* ルーティング
+|   |
+|   |_ public/ # 静的ファイルホスティング
+|   |   |_ js/
+|   |   |   |_ (index.js) # Webpack で生成される
+|   |   |
+|   |   |_ index.html # ドキュメントルートファイル: js/index.js を読み込む
+|   |
+|   |_ app.js  # Expressサーバ｜メインスクリプト
+|
+|_ src/ # Webpack ソースファイル
+|   |_ App.vue 
+|   |_ index.js # Webpack メインソース
+|
+|_ package.json
+|_ webpack.config.js # Webpack バンドル設定
+```
+
+#### app/public/index.html
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+    <!-- id: app の要素を Vue で制御 -->
+    <div id="app"></div>
+    <!-- Webpack でバンドルしたJSファイルを読み込む -->
+    <script src="/js/index.js"></script>
+</body>
+</html>
+```
+
+#### src/App.vue
+```html
+<template>
+  <div>
+    <p>Hello, Vue!</p>
+  </div>
+</template>
+```
+
+#### src/index.js
+```javascript
+import Vue from 'vue'; // Vue を使う
+import App from './App'; // App.vue を読み込む
+
+// IE11/Safari9用のpolyfill
+// babel-polyfill を import するだけで IE11/Safari9 に対応した JavaScript にトランスコンパイルされる
+import 'babel-polyfill';
+
+new Vue({
+  el: '#app', // Vueでマウントする要素
+  render: h => h(App), // App.vue をレンダリング
+});
+```
+
+#### webpack.config.js
+```javascript
+const path = require('path')
+const VueLoaderPlugin = require('vue-loader/lib/plugin')
+
+module.exports = {
+  mode: 'development', // 実行モード: development => 開発, production => 本番
+  entry: './src/index.js', // エントリーポイント: ソースとなる JS ファイル
+  // 出力設定: => ./app/public/js/index.js
+  output: {
+    filename: 'index.js', // バンドル後のファイル名
+    path: path.join(__dirname, 'app', 'public', 'js') // 出力先のパス（※絶対パスで指定すること）
+  },
+  // モジュール読み込みの設定
+  module: {
+    rules: [
+      // .js ファイルを babel-loader でトランスコンパイル
+      {
+        test: /\.js$/,
+        exclude: /node_modules/, // node_modules/ 内のファイルは除外
+        use: [
+          // babel-loader を利用
+          {
+            loader: 'babel-loader',
+            options: {
+              // @babel/preset-env の構文拡張を有効に
+              presets: ['@babel/preset-env']
+            }
+          }
+        ]
+      },
+      // Vue単一ファイルコンポーネント（.vue ファイル）読み込み設定
+      {
+        test: /\.vue$/,
+        // vue-loaderを使って .vue ファイルをコンパイル
+        use: [
+          {
+            loader: 'vue-loader',
+          },
+        ],
+      },
+      // スタイルシート（.css ファイル）読み込み設定
+      {
+        // .css ファイル: css-loader => vue-style-loader の順に適用
+        // - css-loader: cssをJSにトランスコンパイル
+        // - style-loader: <link>タグにスタイル展開
+        test: /\.css$/,
+        use: ['style-loader', 'css-loader']
+      },
+      // Sass（.scss ファイル）コンパイル設定
+      {
+        // sass-loader => css-loader => vue-style-loader の順に適用
+        // vue-style-loader を使うことで .vue ファイル内で <style lang="scss"> を使えるようになる
+        test: /\.scss$/,
+        use: ['vue-style-loader', 'css-loader', 'sass-loader'],
+      },
+
+      /* アイコンローダーの設定 */
+      {
+        test: /\.svg(\?v=\d+\.\d+\.\d+)?$/,
+        use: [{
+          loader: 'url-loader?mimetype=image/svg+xml'
+        }],
+      },
+      {
+        test: /\.(ttf|eot|woff|woff2)(\d+)?(\?v=\d+\.\d+\.\d+)?$/,
+        use: [{
+          loader: 'url-loader?mimetype=application/font-woff'
+        }],
+      },
+    ]
+  },
+  // import文で読み込むモジュールの設定
+  resolve: {
+    extensions: [".js", ".vue"], // .js, .vue をimport可能に
+    modules: ["node_modules"], // node_modulesディレクトリからも import できるようにする
+    alias: {
+      // vue-template-compilerに読ませてコンパイルするために必要な設定
+      vue$: 'vue/dist/vue.esm.js',
+    },
+  },
+  // VueLoaderPluginを使う
+  plugins: [new VueLoaderPlugin()],
+}
+```
+
+#### package.json
+「Expressサーバ起動」と「Webpack監視＆バンドル」を並列実行する npm scripts を記述
+
+```diff
+  {
+    ...
++   "scripts": {
++     "start": "concurrently --kill-others \"webpack --watch --watch-poll\" \"node app/app.js\""
++   }
+  }
+```
+
+### 動作確認
+```bash
+# npm scripts: start
+## => concurrently --kill-others "webpack --watch --watch-poll" "node app/app.js"
+$ yarn start
+
+# => http://localhost:3333 |> "Hello, Vue!" と表示されればOK
 ```

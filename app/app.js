@@ -9,8 +9,8 @@ app.use(express.urlencoded({ extended: true })); // 配列型のフォームデ�
 // API ルーティング: /api/* => ./api/index.js
 app.use('/api/', require('./api/index'));
 
-// 静的ファイルホスティング: /* => ./static/*
-app.use('/', express.static(`${__dirname}/static`));
+// 静的ファイルホスティング: /* => ./public/*
+app.use('/', express.static(`${__dirname}/public`));
 
 // ポート番号: $EXPRESS_PORT 環境変数 or 3333
 const port = process.env.EXPRESS_PORT || 3333;
